@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+redis
+groq
+scikit-learn
+numpy
+sqlmodel
+aiohttp
+cryptography
+python-multipart
+python-dotenv

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZeroWatch — Login</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0f172a;
+            color: #f1f5f9;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 40px;
+            width: 400px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.4);
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .logo-icon {
+            width: 40px; height: 40px;
+            background: #3b82f6;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 16px;
+        }
+        .logo h1 { font-size: 22px; font-weight: 600; }
+        .subtitle { color: #64748b; font-size: 13px; margin-bottom: 32px; }
+        label {
+            display: block;
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 12px 14px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #f1f5f9;
+            font-size: 15px;
+            margin-bottom: 20px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus { border-color: #3b82f6; }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: #2563eb; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .error {
+            background: #ef4444/15;
+            border: 1px solid #ef4444;
+            color: #fca5a5;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .hint {
+            margin-top: 20px;
+            padding: 12px;
+            background: #0f172a;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #64748b;
+            text-align: center;
+        }
+        .hint b { color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="logo">
+            <div class="logo-icon">ZW</div>
+            <h1>ZeroWatch</h1>
+        </div>
+        <p class="subtitle">Zero-Trust Session Security — Demo App Login</p>
+
+        <div class="error" id="error"></div>
+
+        <form id="loginForm">
+            <label for="email">Email</label>
+            <input type="email" id="email" placeholder="admin@gmail.com" value="admin@gmail.com" required>
+
+            <label for="password">Password</label>
+            <input type="password" id="password" placeholder="••••••" value="admin" required>
+
+            <button type="submit" id="btn">Sign In</button>
+        </form>
+
+        <div class="hint">
+            Demo credentials: <b>admin@gmail.com</b> / <b>admin</b>
+        </div>
+    </div>
+
+    <!-- Load ZeroWatch SDK -->
+    <script src="/static/zw-sdk.js"></script>
+    <script>
+        const form = document.getElementById('loginForm');
+        const errorEl = document.getElementById('error');
+        const btn = document.getElementById('btn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorEl.style.display = 'none';
+            btn.disabled = true;
+            btn.textContent = 'Signing in...';
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const resp = await fetch('/api/demo/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password }),
+                    credentials: 'include',
+                });
+                const data = await resp.json();
+
+                if (!resp.ok || data.error) {
+                    throw new Error(data.error || 'Login failed');
+                }
+
+                // Login successful — initialize ZeroWatch SDK
+                btn.textContent = 'Binding device...';
+                await ZeroWatch.init(data.session_id);
+
+                btn.textContent = 'Redirecting...';
+                // Redirect to protected dashboard
+                window.location.href = '/static/dashboard.html';
+
+            } catch (err) {
+                errorEl.textContent = err.message;
+                errorEl.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+            }
+        });
+    </script>
+</body>
+</html>

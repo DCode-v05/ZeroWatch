@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZeroWatch — Protected Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0f172a;
+            color: #f1f5f9;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+        }
+        header {
+            background: #1e293b;
+            border-bottom: 1px solid #334155;
+            padding: 14px 24px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .logo { display: flex; align-items: center; gap: 10px; }
+        .logo-icon {
+            width: 36px; height: 36px; background: #3b82f6; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 14px;
+        }
+        .logo h1 { font-size: 18px; font-weight: 600; }
+        .user-info { font-size: 13px; color: #94a3b8; }
+        .user-info b { color: #f1f5f9; }
+        .badge {
+            display: inline-block; padding: 3px 10px; border-radius: 20px;
+            font-size: 11px; font-weight: 600;
+        }
+        .badge-ok { background: #22c55e22; color: #22c55e; border: 1px solid #22c55e44; }
+        .badge-fail { background: #ef444422; color: #ef4444; border: 1px solid #ef444444; }
+        main { max-width: 800px; margin: 40px auto; padding: 0 20px; }
+        .card {
+            background: #1e293b; border: 1px solid #334155;
+            border-radius: 12px; padding: 24px; margin-bottom: 20px;
+        }
+        .card h2 { font-size: 16px; margin-bottom: 16px; color: #94a3b8; font-weight: 500; }
+        .btn {
+            padding: 10px 20px; border: none; border-radius: 8px;
+            font-size: 14px; font-weight: 600; cursor: pointer; color: white;
+            transition: all 0.2s;
+        }
+        .btn:hover { transform: translateY(-1px); }
+        .btn-blue { background: #3b82f6; }
+        .btn-green { background: #22c55e; }
+        .btn-amber { background: #f59e0b; }
+        .btn-red { background: #ef4444; }
+        .result {
+            background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+            padding: 16px; font-family: 'Consolas', monospace; font-size: 13px;
+            min-height: 60px; white-space: pre-wrap; line-height: 1.6;
+        }
+        .result.ok { border-color: #22c55e44; }
+        .result.err { border-color: #ef444444; color: #fca5a5; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .info-item { background: #0f172a; border-radius: 8px; padding: 12px; }
+        .info-label { font-size: 11px; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
+        .info-value { font-size: 14px; font-family: monospace; word-break: break-all; }
+        .cookie-box {
+            background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+            padding: 14px; font-family: monospace; font-size: 12px;
+            word-break: break-all; margin-top: 12px; color: #f59e0b;
+            user-select: all;
+        }
+        .blocked-overlay {
+            position: fixed; inset: 0; background: rgba(15,23,42,0.95);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000;
+        }
+        .blocked-card {
+            background: #1e293b; border: 2px solid #ef4444; border-radius: 16px;
+            padding: 48px; text-align: center; max-width: 500px;
+        }
+        .blocked-card h1 { color: #ef4444; font-size: 28px; margin-bottom: 12px; }
+        .blocked-card p { color: #94a3b8; font-size: 15px; line-height: 1.6; margin-bottom: 20px; }
+        .blocked-card .detail { font-family: monospace; font-size: 12px; color: #64748b; background: #0f172a; padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align: left; }
+        .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <!-- BLOCKED overlay (shown when session verification fails) -->
+    <div class="blocked-overlay hidden" id="blockedOverlay">
+        <div class="blocked-card">
+            <h1>ACCESS DENIED</h1>
+            <p>
+                Your session cookie was detected, but the <b>ECDSA device signature</b> is missing or invalid.<br><br>
+                This means the cookie was copied from another browser/device. Without the original device's <b>private key</b> (locked in IndexedDB), access is impossible.
+            </p>
+            <div class="detail" id="blockedDetail">Error: missing_signature</div>
+            <a href="/static/login.html" class="btn btn-blue" style="text-decoration:none; display:inline-block;">Go to Login</a>
+        </div>
+    </div>
+
+    <!-- Normal dashboard (shown when session is valid) -->
+    <div id="dashboardContent">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">ZW</div>
+                <h1>Banking Dashboard</h1>
+            </div>
+            <div class="user-info">
+                Logged in as: <b id="userEmail">admin@gmail.com</b>
+                &nbsp;
+                <span class="badge badge-ok" id="sdkStatus">Verifying...</span>
+            </div>
+        </header>
+
+        <main>
+            <div class="card">
+                <h2>Session Information</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Session ID (Cookie)</div>
+                        <div class="info-value" id="sessionId">—</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Device Fingerprint</div>
+                        <div class="info-value" id="fingerprint">—</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">ECDSA Public Key</div>
+                        <div class="info-value" id="pubkey">—</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Private Key</div>
+                        <div class="info-value" style="color: #22c55e;">Non-extractable (locked in IndexedDB)</div>
+                    </div>
+                </div>
+                <div class="cookie-box" id="cookieDisplay">Loading...</div>
+            </div>
+
+            <div class="card">
+                <h2>Protected API Endpoints</h2>
+                <div class="actions">
+                    <button class="btn btn-blue" onclick="callEndpoint('/app/dashboard')">Load Account Data</button>
+                    <button class="btn btn-green" onclick="callEndpoint('/app/transfer')">View Transfers</button>
+                    <button class="btn btn-amber" onclick="callEndpoint('/app/admin')">Admin Panel</button>
+                    <button class="btn btn-red" onclick="callEndpoint('/app/export')">Export Records</button>
+                </div>
+                <div class="result" id="apiResult">Click a button to call a protected endpoint.
+Each request is signed with your device's ECDSA private key.</div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/zw-sdk.js"></script>
+    <script>
+        const resultEl = document.getElementById('apiResult');
+
+        function getSessionId() {
+            const m = document.cookie.match(/session_id=([^;]+)/);
+            return m ? m[1] : null;
+        }
+
+        async function initPage() {
+            const sid = getSessionId();
+
+            // No cookie at all → go to login
+            if (!sid) {
+                window.location.href = '/static/login.html';
+                return;
+            }
+
+            document.getElementById('sessionId').textContent = sid;
+            document.getElementById('cookieDisplay').textContent = 'session_id=' + sid;
+
+            // Load existing key from IndexedDB WITHOUT re-registering.
+            // In Browser B (attacker), this creates a NEW key but does NOT
+            // register it on the server, so the server still has Browser A's pubkey.
+            try {
+                await ZeroWatch.resume(sid);
+            } catch(e) {
+                // SDK resume failed — no key in this browser
+            }
+
+            // Now verify the session by calling a PROTECTED endpoint.
+            // The middleware requires a valid ECDSA signature.
+            // If this browser doesn't have the private key, fetch will send
+            // the request without a valid signature → 401.
+            try {
+                const resp = await fetch('/api/session/verify', { credentials: 'include' });
+                const data = await resp.json();
+
+                if (resp.ok && data.status === 'valid') {
+                    // Session is valid — show dashboard
+                    document.getElementById('sdkStatus').textContent = 'Verified';
+                    document.getElementById('sdkStatus').className = 'badge badge-ok';
+                    document.getElementById('fingerprint').textContent =
+                        (ZeroWatch.getFingerprint() || '').slice(0, 24) + '...';
+                    document.getElementById('pubkey').textContent =
+                        (ZeroWatch.getPublicKey() || '').slice(0, 24) + '...';
+                } else {
+                    // Verification failed — show BLOCKED
+                    showBlocked(data.error || 'verification_failed');
+                }
+            } catch (e) {
+                showBlocked('network_error');
+            }
+        }
+
+        function showBlocked(reason) {
+            document.getElementById('blockedDetail').textContent =
+                'Error: ' + reason + '\n\n' +
+                'Cookie: session_id=' + (getSessionId() || 'none') + '\n' +
+                'ECDSA Private Key: NOT FOUND in this browser\'s IndexedDB\n' +
+                'Result: Request rejected — cookie alone is NOT enough.';
+            document.getElementById('blockedOverlay').classList.remove('hidden');
+            document.getElementById('dashboardContent').classList.add('hidden');
+        }
+
+        async function callEndpoint(path) {
+            resultEl.className = 'result';
+            resultEl.textContent = 'Calling ' + path + '...\n';
+            try {
+                const resp = await fetch(path, { credentials: 'include' });
+                const data = await resp.json();
+                if (resp.ok) {
+                    const score = resp.headers.get('X-ZeroWatch-Score');
+                    resultEl.className = 'result ok';
+                    resultEl.textContent =
+                        'STATUS: ' + resp.status + ' OK\n' +
+                        'X-ZeroWatch-Score: ' + (score || 'N/A') + '\n' +
+                        'Response: ' + JSON.stringify(data, null, 2);
+                } else {
+                    resultEl.className = 'result err';
+                    resultEl.textContent =
+                        'STATUS: ' + resp.status + ' BLOCKED\n' +
+                        JSON.stringify(data, null, 2);
+                }
+            } catch (e) {
+                resultEl.className = 'result err';
+                resultEl.textContent = 'Error: ' + e.message;
+            }
+        }
+
+        initPage();
+    </script>
+</body>
+</html>

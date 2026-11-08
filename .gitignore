@@ -55,3 +55,12 @@ dump.rdb
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Env examples stay tracked
+!.env.example
+
+# Caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.tsbuildinfo

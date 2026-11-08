@@ -64,7 +64,7 @@ npm install
 npm run dev     # http://localhost:5173, proxies /api and /ws to :8000
 ```
 
-API docs are at http://localhost:8000/docs. `Code/scripts/seed_baseline.py` seeds demo baselines in Redis and `python Code/scripts/demo_attack.py --scenario stolen_token` runs a scenario from the command line (the script uses the `--scenario` flag; `full_attack` also works).
+API docs are at http://localhost:8000/docs. `Code/scripts/seed_baseline.py` seeds demo baselines in Redis and `python Code/scripts/demo_attack.py --scenario stolen_token` runs a scenario from the command line.
 
 ## API
 

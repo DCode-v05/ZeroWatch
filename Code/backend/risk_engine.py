@@ -53,7 +53,6 @@ def score_session(baseline: UserBaseline, signals: dict) -> tuple[float, dict]:
     """Score a session against the baseline. Returns (score 0-100, z_scores dict)."""
     z_scores = {}
 
-    # Categorical: unknown country or device_fp → max anomaly
     ip = signals.get("ip_country", "US")
     z_scores["ip_country"] = 0.0 if ip in baseline.ip_countries else 5.0
 
@@ -63,7 +62,6 @@ def score_session(baseline: UserBaseline, signals: dict) -> tuple[float, dict]:
     else:
         z_scores["device_fp"] = 0.0
 
-    # Numerical
     z_scores["data_mb"] = z_score(
         signals.get("data_mb", baseline.data_mb_mean),
         baseline.data_mb_mean, baseline.data_mb_std
@@ -85,9 +83,7 @@ def score_session(baseline: UserBaseline, signals: dict) -> tuple[float, dict]:
         baseline.wpm_mean, baseline.wpm_std
     )
 
-    # Weighted sum → scale to 0-100
     raw = sum(z_scores[k] * WEIGHTS[k] for k in WEIGHTS)
-    # Scale: raw z of ~5 max per feature, weighted sum max ~5, map to 0-100
     score = min(100.0, max(0.0, raw * 20.0))
 
     return round(score, 1), z_scores

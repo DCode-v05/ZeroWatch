@@ -6,11 +6,9 @@ from backend.session_store import set_risk_score, get_session
 
 async def signal_worker(signal_queue: asyncio.Queue, broadcast_fn):
     """Background worker: consume signal queue, compute risk scores, broadcast via WebSocket."""
-    # Accumulate signals per session
     session_signals: dict[str, dict] = {}
 
     while True:
-        # Drain all queued signals
         batch = []
         try:
             while True:
@@ -19,25 +17,21 @@ async def signal_worker(signal_queue: asyncio.Queue, broadcast_fn):
         except asyncio.QueueEmpty:
             pass
 
-        # Merge signals into per-session accumulators
         for sig in batch:
             sid = sig.get("session_id", "")
             if not sid:
                 continue
             if sid not in session_signals:
                 session_signals[sid] = {}
-            # Merge signal values (latest wins)
             sig_type = sig.get("signal_type", sig.get("type", ""))
             value = sig.get("value", 0)
             if sig_type:
                 session_signals[sid][sig_type] = value
-            # Also merge any top-level signal fields
             for key in ["ip_country", "device_fp", "data_mb", "api_calls",
                         "login_hour", "mouse_velocity", "wpm"]:
                 if key in sig:
                     session_signals[sid][key] = sig[key]
 
-        # Score each active session
         for sid, signals in list(session_signals.items()):
             session_data = await get_session(sid)
             if not session_data:
@@ -50,7 +44,6 @@ async def signal_worker(signal_queue: asyncio.Queue, broadcast_fn):
 
             await set_risk_score(sid, score)
 
-            # Broadcast to WebSocket clients
             await broadcast_fn({
                 "type": "risk_update",
                 "session_id": sid,

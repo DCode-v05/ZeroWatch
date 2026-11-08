@@ -15,7 +15,6 @@ async def seed():
     await r.ping()
     print("Connected to Redis. Seeding baselines...")
 
-    # Create baselines for demo users (IDs 1-5)
     demo_users = {
         "1": UserBaseline(
             login_hour_mean=9.5, login_hour_std=1.2,
@@ -43,7 +42,6 @@ async def seed():
         print(f"    Countries: {baseline.ip_countries}")
         print(f"    Login hour: {baseline.login_hour_mean} +/- {baseline.login_hour_std}")
 
-    # Also store 30 synthetic "normal" signal snapshots for training reference
     for i in range(30):
         snapshot = {
             "session_id": f"synthetic-{i}",

@@ -119,7 +119,6 @@
         </div>
     </div>
 
-    <!-- Load ZeroWatch SDK -->
     <script src="/static/zw-sdk.js"></script>
     <script>
         const form = document.getElementById('loginForm');
@@ -148,12 +147,10 @@
                     throw new Error(data.error || 'Login failed');
                 }
 
-                // Login successful — initialize ZeroWatch SDK
                 btn.textContent = 'Binding device...';
                 await ZeroWatch.init(data.session_id);
 
                 btn.textContent = 'Redirecting...';
-                // Redirect to protected dashboard
                 window.location.href = '/static/dashboard.html';
 
             } catch (err) {

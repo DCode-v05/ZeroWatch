@@ -14,7 +14,6 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#0f172a]">
-      {/* Tab nav - only show if not on dashboard (dashboard has its own header) */}
       {tab !== 'dashboard' && (
         <nav className="bg-[#1e293b] border-b border-[#334155] px-6 py-2 flex items-center gap-1">
           <div className="flex items-center gap-3 mr-6">
@@ -39,10 +38,8 @@ function App() {
         </nav>
       )}
 
-      {/* Dashboard has its own header, so render it directly */}
       {tab === 'dashboard' && (
         <div>
-          {/* Invisible tab switcher overlaid on dashboard header */}
           <div className="fixed top-0 right-4 z-50 flex gap-1 pt-2.5">
             {TABS.filter(t => t.id !== 'dashboard').map((t) => (
               <button

@@ -30,7 +30,6 @@ async def synthesise_baseline(role: str, department: str, access_permissions: st
             }],
         )
         text = response.choices[0].message.content.strip()
-        # Extract JSON from response
         if text.startswith("```"):
             text = text.split("```")[1]
             if text.startswith("json"):

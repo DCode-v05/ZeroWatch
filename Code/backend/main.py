@@ -21,31 +21,25 @@ from backend.models import User, Session as SessionModel, Incident, SignalEvent 
 
 engine = create_engine(DATABASE_URL, echo=False)
 
-# Global signal queue (replaces Kafka)
 signal_queue: asyncio.Queue = asyncio.Queue()
 
-# Connected WebSocket clients
 ws_clients: list[WebSocket] = []
 
-# Active demo session tracking
 demo_state: dict = {}
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: create DB tables + verify Redis
     SQLModel.metadata.create_all(engine)
     r = await get_redis()
     await r.ping()
     print("Redis connected, SQLite tables created.")
 
-    # Start signal worker background task
     from backend.signal_worker import signal_worker
     worker_task = asyncio.create_task(signal_worker(signal_queue, broadcast_risk))
 
     yield
 
-    # Shutdown
     worker_task.cancel()
     r = await get_redis()
     await r.aclose()
@@ -67,7 +61,6 @@ def get_db():
         yield session
 
 
-# ─── Health ───
 @app.get("/health")
 async def health():
     try:
@@ -79,7 +72,6 @@ async def health():
     return {"status": "ok", "redis": redis_status}
 
 
-# ─── WebSocket for live risk scores ───
 @app.websocket("/ws/risk")
 async def ws_risk(websocket: WebSocket):
     await websocket.accept()
@@ -104,7 +96,6 @@ async def broadcast_risk(data: dict):
             ws_clients.remove(ws)
 
 
-# ─── Auth ───
 class LoginRequest(BaseModel):
     username: str
     password: str = "demo"
@@ -140,7 +131,6 @@ async def login(req: LoginRequest, response: Response):
     return {"session_id": session_id, "user_id": user_id, "username": username}
 
 
-# ─── Demo Login (email/password for static demo pages) ───
 class DemoLoginRequest(BaseModel):
     email: str
     password: str
@@ -155,7 +145,6 @@ async def demo_login(req: DemoLoginRequest, response: Response):
             media_type="application/json",
         )
 
-    # Create or get the admin user
     with DBSession(engine) as db:
         user = db.exec(select(User).where(User.username == "admin")).first()
         if not user:
@@ -185,7 +174,6 @@ async def demo_login(req: DemoLoginRequest, response: Response):
     return {"session_id": session_id, "user_id": user_id, "username": "admin"}
 
 
-# ─── Session verification (protected by middleware — requires valid ECDSA sig) ───
 @app.get("/api/session/verify")
 async def verify_session(request: Request):
     session_id = request.cookies.get("session_id")
@@ -208,7 +196,6 @@ async def register_device(request: Request):
     return {"error": "Missing session_id or pubkey"}
 
 
-# ─── Signals ───
 @app.post("/api/signals")
 async def receive_signals(request: Request):
     body = await request.json()
@@ -220,7 +207,6 @@ async def receive_signals(request: Request):
     return {"queued": len(signals)}
 
 
-# ─── Users ───
 class CreateUserRequest(BaseModel):
     username: str
     role: str = "Analyst"
@@ -250,7 +236,6 @@ async def create_user(req: CreateUserRequest):
         db.commit()
         db.refresh(user)
 
-    # LLM baseline generation
     try:
         from backend.llm import synthesise_baseline
         baseline = await synthesise_baseline(req.role, req.department, req.access_permissions)
@@ -261,7 +246,6 @@ async def create_user(req: CreateUserRequest):
             db.commit()
         await set_baseline(str(user.id), baseline)
 
-        # Also create a behavioral baseline for scoring
         behavioral = UserBaseline(
             login_hour_mean=baseline.get("expected_hours_start", 9),
             login_hour_std=1.5,
@@ -280,12 +264,10 @@ async def create_user(req: CreateUserRequest):
         import traceback
         print(f"LLM baseline skipped: {e}")
         traceback.print_exc()
-        # Save default behavioral baseline anyway
         await save_baseline(str(user.id), UserBaseline())
         return {"user_id": user.id, "username": user.username, "baseline": {}, "note": "LLM not configured yet"}
 
 
-# ─── Demo Simulation ───
 @app.post("/api/demo/simulate/{scenario}")
 async def simulate(scenario: str):
     """Simulate attack scenarios for the demo. Each pushes signals into the queue."""
@@ -293,7 +275,6 @@ async def simulate(scenario: str):
     user_id = demo_state.get("active_user_id", 1)
     username = demo_state.get("active_username", "demo")
 
-    # Ensure session exists in Redis
     existing = await get_session(session_id)
     if not existing:
         await set_session(session_id, {
@@ -332,8 +313,6 @@ async def simulate(scenario: str):
         return {"scenario": "change_country", "status": "signals_sent", "expected_score": "25-40"}
 
     elif scenario == "stolen_token":
-        # No ECDSA signature — this is handled by the middleware
-        # Push signals with unknown device
         signals = {
             "session_id": session_id,
             "ip_country": "CN",
@@ -362,7 +341,6 @@ async def simulate(scenario: str):
         return {"scenario": "rapid_export", "status": "signals_sent", "expected_score": "60-80"}
 
     elif scenario == "full_attack":
-        # Multi-step escalating attack
         steps = [
             {"ip_country": "US", "device_fp": "known-device", "data_mb": 5, "api_calls": 10, "login_hour": 10, "mouse_velocity": 280, "wpm": 42},
             {"ip_country": "RU", "device_fp": "known-device", "data_mb": 8, "api_calls": 15, "login_hour": 10, "mouse_velocity": 200, "wpm": 35},
@@ -375,7 +353,7 @@ async def simulate(scenario: str):
             for i, step in enumerate(steps):
                 step["session_id"] = session_id
                 await signal_queue.put(step)
-                await asyncio.sleep(3)  # Wait for worker to process
+                await asyncio.sleep(3)
 
         asyncio.create_task(escalate())
         return {"scenario": "full_attack", "status": "escalation_started", "steps": len(steps)}
@@ -383,7 +361,6 @@ async def simulate(scenario: str):
     return {"error": f"Unknown scenario: {scenario}"}
 
 
-# ─── Active sessions list ───
 @app.get("/api/sessions")
 async def list_sessions():
     r = await get_redis()
@@ -402,7 +379,6 @@ async def list_sessions():
     return {"sessions": sessions}
 
 
-# ─── Incidents list ───
 @app.get("/api/incidents")
 async def list_incidents():
 
@@ -416,7 +392,6 @@ async def list_incidents():
         ]}
 
 
-# ─── Protected app routes (these require ECDSA device binding) ───
 @app.get("/app/dashboard")
 async def app_dashboard():
     return {"page": "dashboard", "data": "Account Balance: $48,239.00", "status": "authenticated"}
@@ -434,10 +409,8 @@ async def app_export():
     return {"page": "export", "data": "10,000 records available", "status": "sensitive_endpoint"}
 
 
-# ─── Serve static files (demo app HTML pages) ───
 _static_dir = Path(__file__).resolve().parent.parent / "static"
 app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
-# ─── Add middleware (must be after route registration) ───
 from backend.middleware import ZeroWatchMiddleware
 app.add_middleware(ZeroWatchMiddleware)

@@ -24,7 +24,6 @@ function predictiveData(history) {
   const slope = den !== 0 ? num / den : 0;
   const intercept = yMean - slope * xMean;
 
-  // Project 3 steps ahead
   const predictions = [];
   for (let i = 1; i <= 3; i++) {
     const projected = Math.max(0, Math.min(100, slope * (n - 1 + i) + intercept));
@@ -43,7 +42,6 @@ export default function Dashboard() {
     const predictions = predictiveData(scoreHistory);
     const base = scoreHistory.map((p) => ({ ...p, predicted: null }));
     if (predictions.length > 0 && scoreHistory.length > 0) {
-      // Bridge: last real point also appears as first predicted
       const lastReal = scoreHistory[scoreHistory.length - 1];
       return [
         ...base,
@@ -61,7 +59,6 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Header */}
       <header className="bg-[#1e293b] border-b border-[#334155] px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
@@ -89,9 +86,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Main content */}
       <main className="flex-1 p-6 space-y-6 overflow-y-auto pb-24">
-        {/* Top row: Gauge + Chart */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1">
             <RiskGauge score={score} />
@@ -137,14 +132,11 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Middle: Heatmap */}
         <SignalHeatmap zScores={z_scores} />
 
-        {/* Bottom: Incidents */}
         <IncidentCard incidents={incidents} />
       </main>
 
-      {/* Fixed bottom bar: Attack Simulator */}
       <div className="fixed bottom-0 left-0 right-0 z-50">
         <AttackSimulator />
       </div>

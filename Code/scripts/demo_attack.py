@@ -14,7 +14,6 @@ BASE_URL = "http://localhost:8000"
 
 async def run_scenario(scenario: str):
     async with aiohttp.ClientSession() as session:
-        # 1. Create demo user
         print("[1/4] Creating demo user Sneha...")
         async with session.post(f"{BASE_URL}/api/users", json={
             "username": "Sneha",
@@ -25,7 +24,6 @@ async def run_scenario(scenario: str):
             data = await resp.json()
             print(f"  User: {data}")
 
-        # 2. Login
         print("[2/4] Logging in...")
         async with session.post(f"{BASE_URL}/api/auth/login", json={
             "username": "Sneha",
@@ -34,7 +32,6 @@ async def run_scenario(scenario: str):
             session_id = data.get("session_id", "")
             print(f"  Session: {session_id}")
 
-        # 3. Normal activity
         print("[3/4] Sending normal activity...")
         async with session.post(f"{BASE_URL}/api/demo/simulate/normal") as resp:
             data = await resp.json()
@@ -42,7 +39,6 @@ async def run_scenario(scenario: str):
 
         await asyncio.sleep(4)
 
-        # 4. Run attack scenario
         print(f"[4/4] Running attack: {scenario}")
         async with session.post(f"{BASE_URL}/api/demo/simulate/{scenario}") as resp:
             data = await resp.json()

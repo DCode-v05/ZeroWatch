@@ -83,7 +83,6 @@
     </style>
 </head>
 <body>
-    <!-- BLOCKED overlay (shown when session verification fails) -->
     <div class="blocked-overlay hidden" id="blockedOverlay">
         <div class="blocked-card">
             <h1>ACCESS DENIED</h1>
@@ -96,7 +95,6 @@
         </div>
     </div>
 
-    <!-- Normal dashboard (shown when session is valid) -->
     <div id="dashboardContent">
         <header>
             <div class="logo">
@@ -160,7 +158,6 @@ Each request is signed with your device's ECDSA private key.</div>
         async function initPage() {
             const sid = getSessionId();
 
-            // No cookie at all → go to login
             if (!sid) {
                 window.location.href = '/static/login.html';
                 return;
@@ -169,25 +166,16 @@ Each request is signed with your device's ECDSA private key.</div>
             document.getElementById('sessionId').textContent = sid;
             document.getElementById('cookieDisplay').textContent = 'session_id=' + sid;
 
-            // Load existing key from IndexedDB WITHOUT re-registering.
-            // In Browser B (attacker), this creates a NEW key but does NOT
-            // register it on the server, so the server still has Browser A's pubkey.
             try {
                 await ZeroWatch.resume(sid);
             } catch(e) {
-                // SDK resume failed — no key in this browser
             }
 
-            // Now verify the session by calling a PROTECTED endpoint.
-            // The middleware requires a valid ECDSA signature.
-            // If this browser doesn't have the private key, fetch will send
-            // the request without a valid signature → 401.
             try {
                 const resp = await fetch('/api/session/verify', { credentials: 'include' });
                 const data = await resp.json();
 
                 if (resp.ok && data.status === 'valid') {
-                    // Session is valid — show dashboard
                     document.getElementById('sdkStatus').textContent = 'Verified';
                     document.getElementById('sdkStatus').className = 'badge badge-ok';
                     document.getElementById('fingerprint').textContent =
@@ -195,7 +183,6 @@ Each request is signed with your device's ECDSA private key.</div>
                     document.getElementById('pubkey').textContent =
                         (ZeroWatch.getPublicKey() || '').slice(0, 24) + '...';
                 } else {
-                    // Verification failed — show BLOCKED
                     showBlocked(data.error || 'verification_failed');
                 }
             } catch (e) {

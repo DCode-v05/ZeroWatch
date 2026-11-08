@@ -1,14 +1,10 @@
-/**
- * ZeroWatch Browser SDK — IIFE, zero dependencies
- * ECDSA P-256 device binding + fingerprint + fetch interceptor + signal collection
- */
 (function () {
   "use strict";
 
   const DB_NAME = "ZeroWatchKeys";
   const STORE_NAME = "keys";
   const KEY_ID = "device-signing-key";
-  const SIGNAL_INTERVAL = 2000; // 2 seconds
+  const SIGNAL_INTERVAL = 2000;
 
   let keyPair = null;
   let sessionId = null;
@@ -17,7 +13,6 @@
   let keystrokes = [];
   let mousePositions = [];
 
-  // ─── 1. ECDSA Key Management (IndexedDB) ───
   function openDB() {
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, 1);
@@ -30,7 +25,6 @@
   async function loadOrCreateKey() {
     const db = await openDB();
 
-    // Try loading existing key
     const existing = await new Promise((resolve) => {
       const tx = db.transaction(STORE_NAME, "readonly");
       const req = tx.objectStore(STORE_NAME).get(KEY_ID);
@@ -44,10 +38,9 @@
     } else {
       keyPair = await crypto.subtle.generateKey(
         { name: "ECDSA", namedCurve: "P-256" },
-        false, // non-extractable private key
+        false,
         ["sign", "verify"]
       );
-      // Store in IndexedDB
       await new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, "readwrite");
         const req = tx.objectStore(STORE_NAME).put(keyPair, KEY_ID);
@@ -57,7 +50,6 @@
       console.log("[ZeroWatch] Generated new ECDSA P-256 key pair");
     }
 
-    // Export public key for server registration
     const pubRaw = await crypto.subtle.exportKey("raw", keyPair.publicKey);
     const pubB64 = btoa(String.fromCharCode(...new Uint8Array(pubRaw)));
     sessionStorage.setItem("zw_pubkey", pubB64);
@@ -65,11 +57,9 @@
     return keyPair;
   }
 
-  // ─── 2. Device Fingerprint ───
   async function generateFingerprint() {
     const components = [];
 
-    // Canvas fingerprint
     try {
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
@@ -81,7 +71,6 @@
       components.push("canvas-unavailable");
     }
 
-    // WebGL fingerprint
     try {
       const gl =
         document.createElement("canvas").getContext("webgl") ||
@@ -98,12 +87,10 @@
       components.push("webgl-unavailable");
     }
 
-    // Screen + navigator info
     components.push(`${screen.width}x${screen.height}x${screen.colorDepth}`);
     components.push(navigator.language || "");
     components.push(String(navigator.hardwareConcurrency || ""));
 
-    // SHA-256 hash
     const raw = components.join("|");
     const buf = await crypto.subtle.digest(
       "SHA-256",
@@ -119,11 +106,9 @@
     return hash;
   }
 
-  // ─── 3. Fetch Interceptor ───
   const originalFetch = window.fetch;
 
   async function signedFetch(input, init = {}) {
-    // Skip signing for signal and auth endpoints to avoid recursion
     const url = typeof input === "string" ? input : input.url || "";
     if (
       url.includes("/api/signals") ||
@@ -149,7 +134,6 @@
         );
         const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sigBuf)));
 
-        // Also send the pubkey so server can match it to the registered device
         const pubkey = sessionStorage.getItem("zw_pubkey") || "";
 
         init.headers = {
@@ -168,16 +152,12 @@
 
   window.fetch = signedFetch;
 
-  // ─── 4. Signal Collection ───
-  // WPM tracking
   document.addEventListener("keyup", () => {
     keystrokes.push(Date.now());
-    // Keep last 60 seconds
     const cutoff = Date.now() - 60000;
     keystrokes = keystrokes.filter((t) => t > cutoff);
   });
 
-  // Mouse velocity tracking
   let lastMouse = { x: 0, y: 0, t: 0 };
   document.addEventListener("mousemove", (e) => {
     const now = Date.now();
@@ -207,7 +187,6 @@
     );
   }
 
-  // Batch POST signals every 2 seconds
   setInterval(async () => {
     if (!sessionId) return;
     const signals = [
@@ -228,19 +207,14 @@
         credentials: "include",
       });
     } catch (e) {
-      // Silently fail
     }
   }, SIGNAL_INTERVAL);
 
-  // ─── 5. Public API ───
-
-  // Full init: generate/load key + fingerprint + register pubkey with server
   async function init(sid) {
     sessionId = sid || sessionId;
     await loadOrCreateKey();
     await generateFingerprint();
 
-    // Register device with server
     const pubkey = sessionStorage.getItem("zw_pubkey");
     if (pubkey && sessionId) {
       try {
@@ -257,8 +231,6 @@
     }
   }
 
-  // Light init: load existing key from IndexedDB only (no registration).
-  // Used on protected pages to resume signing without overwriting the server pubkey.
   async function resume(sid) {
     sessionId = sid || sessionId;
     await loadOrCreateKey();
